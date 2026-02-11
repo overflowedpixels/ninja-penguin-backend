@@ -34,18 +34,7 @@ const TOTAL_COLUMNS = 5;    // number of columns in template2
 
 // ================= HELPERS =================
 
-const imageModule = new ImageModule({
-  centered: true,
-  getImage: async (tagValue) => {
-    // tagValue = URL
-    const res = await axios.get(tagValue, {
-      responseType: "arraybuffer",
-    });
-    return Buffer.from(res.data);
-  },
-
-  getSize: () => [200, 150], // adjust
-});
+ 
 
 // Column-wise transformer
 function columnWiseTable(data, rowsPerCol, cols) {
@@ -83,7 +72,16 @@ app.post("/test", async (req, res) => {
     let isGreater = false;
 
     console.log(req.body);
-
+    const imageModule = new ImageModule({
+      centered: true,
+      getImage: async (tagValue) => {
+        const res = await axios.get(tagValue, {
+        responseType: "arraybuffer",
+      });
+      return Buffer.from(res.data);
+    },
+  getSize: () => [200, 150],
+    });
     if (req.body.serialNumbers && req.body.serialNumbers.length > 50) {
       isGreater = true;
       // ---------------- TEMPLATE 1 ----------------
@@ -263,3 +261,4 @@ app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");
 
 });
+
