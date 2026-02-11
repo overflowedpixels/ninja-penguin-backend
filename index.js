@@ -167,6 +167,8 @@ app.post("/test", async (req, res) => {
       modules: [imageModule],
     });
 
+    console.log("Images:", req.body.sitePictures);
+
     await doc3.renderAsync({
       images: req.body.sitePictures.map((url) => ({ img: url })),
     });
@@ -261,4 +263,5 @@ app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");
 
 });
+
 
