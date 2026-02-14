@@ -20,6 +20,9 @@ const EMAIL_PASS = "osavmoezpkvooyhp";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
+  port: 465,
+  secure: true,
+  family: 4, 
   auth: {
     user: EMAIL_USER,
     pass: EMAIL_PASS,
@@ -263,5 +266,6 @@ app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");
 
 });
+
 
 
