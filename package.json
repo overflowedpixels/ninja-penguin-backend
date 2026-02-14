@@ -19,8 +19,9 @@
     "express": "^5.2.1",
     "fs": "^0.0.1-security",
     "html-to-docx": "^1.8.0",
-    "nodemailer": "^8.0.0",
+    "jszip": "^3.10.1",
     "path": "^0.12.7",
-    "pizzip": "^3.2.0"
+    "pizzip": "^3.2.0",
+    "resend": "^6.9.2"
   }
 }
