@@ -3,31 +3,23 @@ const fs = require("fs");
 const PizZip = require("pizzip");
 const Docxtemplater = require("docxtemplater");
 const cors = require("cors");
-const nodemailer = require("nodemailer");
 const DocxMerger = require("docx-merger");
 const { log } = require("console");
 const ImageModule = require("docxtemplater-image-module-free");
 const axios = require("axios");
-
+const { Resend } = require("resend");
 const app = express();
 app.use(cors());
+const JSZip = require("jszip");
 app.use(express.json({ limit: "10mb" }));
 
 // ================= EMAIL CONFIG =================
 
-const EMAIL_USER = "overflowedpixels@gmail.com";
-const EMAIL_PASS = "osavmoezpkvooyhp";
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  port: 465,
-  secure: true,
-  family: 4, 
-  auth: {
-    user: EMAIL_USER,
-    pass: EMAIL_PASS,
-  },
-});
+const EMAIL_USER = "overflowedpixels@gmail.com";
+const resend = new Resend("re_T18UFtDc_PgnHizWhFcS2sf8dEGbFezMG");
+
+console.log(resend);
 
 // ================= CONFIG =================
 
@@ -37,7 +29,18 @@ const TOTAL_COLUMNS = 5;    // number of columns in template2
 
 // ================= HELPERS =================
 
- 
+const getImageModule = () => new ImageModule({
+  centered: true,
+  getImage: async (tagValue) => {
+    // tagValue = URL
+    const res = await axios.get(tagValue, {
+      responseType: "arraybuffer",
+    });
+    return Buffer.from(res.data);
+  },
+
+  getSize: () => [200, 150], // adjust
+});
 
 // Column-wise transformer
 function columnWiseTable(data, rowsPerCol, cols) {
@@ -64,9 +67,19 @@ function splitIntoPages(data, pageSize = 175) {
   return pages;
 }
 
+async function compressDocx(buffer) {
+  const zip = await JSZip.loadAsync(buffer);
+
+  return await zip.generateAsync({
+    type: "nodebuffer",
+    compression: "DEFLATE",
+    compressionOptions: { level: 9 } // max compression
+  });
+}
 // ================= API =================
 
 app.post("/test", async (req, res) => {
+
   try {
     // Load DOCX templates
     let file1 = fs.readFileSync("template1.docx", "binary");
@@ -75,16 +88,7 @@ app.post("/test", async (req, res) => {
     let isGreater = false;
 
     console.log(req.body);
-    const imageModule = new ImageModule({
-      centered: true,
-      getImage: async (tagValue) => {
-        const res = await axios.get(tagValue, {
-        responseType: "arraybuffer",
-      });
-      return Buffer.from(res.data);
-    },
-  getSize: () => [200, 150],
-    });
+
     if (req.body.serialNumbers && req.body.serialNumbers.length > 50) {
       isGreater = true;
       // ---------------- TEMPLATE 1 ----------------
@@ -167,10 +171,8 @@ app.post("/test", async (req, res) => {
     const doc3 = new Docxtemplater(zip3, {
       paragraphLoop: true,
       linebreaks: true,
-      modules: [imageModule],
+      modules: [getImageModule()],
     });
-
-    console.log("Images:", req.body.sitePictures);
 
     await doc3.renderAsync({
       images: req.body.sitePictures.map((url) => ({ img: url })),
@@ -189,44 +191,61 @@ app.post("/test", async (req, res) => {
       fileArray.splice(1, 1);
     }
     const merger = new DocxMerger({}, fileArray);
-
-    merger.save("nodebuffer", async (data) => {
-      try {
-        await transporter.sendMail({
-          from: EMAIL_USER,
-          to: "penguinninja8@gmail.com",
-          subject: "Document",
-          text: "Here is your document",
-          attachments: [
-            {
-              filename: "document.docx",
-              content: data,
-            },
-          ],
-        });
-
-        console.log("Email sent successfully");
-        await transporter.sendMail({
-          from: EMAIL_USER,
-          to: req.body.EPC_Email,
-          subject: "Request has been Approved",
-          text: `Hello ${req.body.EPC_Name},\n\nYour request has been approved.\n\nRegards,\nTeam TrueSun`,
-        });
-        return res.status(200).json({
-          message: "Document generated and sent successfully",
-          success: true,
-        });
-
-      } catch (emailErr) {
-        console.error("Email Error:", emailErr);
-
-        return res.status(500).json({
-          success: false,
-          error: "Document generated but email failed",
-          details: emailErr.message,
-        });
-      }
+    const mergedBuffer = await new Promise((resolve) => {
+      merger.save("nodebuffer", (data) => resolve(data));
     });
+    const data = await compressDocx(mergedBuffer);
+
+    try {
+      // Send document email via Resend
+      const { data: emailData, error: emailError } = await resend.emails.send({
+        from: "onboarding@resend.dev",
+        to: "overflowedpixels@gmail.com",
+        subject: "Hello world",
+        text: "<h1>Hello world</h1>",
+        attachments: [
+          {
+            filename: "document.docx",
+            content: data,
+          },
+        ],
+      });
+
+      if (emailError) {
+        console.error("Resend error (Document Email):", emailError);
+      } else {
+        console.log("Document email sent successfully:", emailData);
+
+        // Only send approval email if document email succeeded
+        if (req.body.EPC_Email) {
+          const { data: approvalData, error: approvalError } = await resend.emails.send({
+            from: "onboarding@resend.dev",
+            to: req.body.EPC_Email,
+            subject: "Request Approved",
+            text: "Dear " + req.body.EPC_Per + ",\n\nYour request has been approved.\n\nAnd your warranty number is " + req.body.WARR_No + ".\n\nWe will notify you when your warranty is ready.\n\nThank you,\nTrueSun Team",
+          });
+
+          if (approvalError) {
+            console.error("Resend error (Approval Email):", approvalError);
+          } else {
+            console.log("Approval email sent successfully:", approvalData);
+          }
+        }
+      }
+
+    } catch (emailErr) {
+      console.error("Email sending failed (Exception):", emailErr);
+      // We continue to return the file even if email fails
+    }
+
+    // Return success with file data
+    return res.status(200).json({
+      message: "Document generated successfully (Email attempt made)",
+      success: true,
+      file: data.toString("base64")
+    });
+
+
 
 
   } catch (err) {
@@ -242,11 +261,11 @@ app.post("/send-rejection-email", async (req, res) => {
   const { email, name, reason } = req.body;
 
   try {
-    await transporter.sendMail({
-      from: EMAIL_USER,
+    await resend.emails.send({
+      from: "onboarding@resend.dev",
       to: email,
       subject: "Request Rejected - Service Integrator Portal",
-      text: `Hello ${name},\n\nYour request has been rejected for the following reason:\n\n${reason}\n\nRegards,\nAdmin Team`,
+      text: `Hello ${name},\n\nYour request has been rejected for the following reason:\n\n${reason}\n\nRegards,\nTrueSun Team`,
     });
 
     console.log(`Rejection email sent to ${email}`);
@@ -264,8 +283,4 @@ app.get("/", (req, res) => {
 
 app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");
-
 });
-
-
-
