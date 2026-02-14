@@ -8,6 +8,7 @@ const { log } = require("console");
 const ImageModule = require("docxtemplater-image-module-free");
 const axios = require("axios");
 const { Resend } = require("resend");
+require("dotenv").config();
 const app = express();
 app.use(cors());
 const JSZip = require("jszip");
@@ -17,7 +18,7 @@ app.use(express.json({ limit: "10mb" }));
 
 
 const EMAIL_USER = "overflowedpixels@gmail.com";
-const resend = new Resend("re_T18UFtDc_PgnHizWhFcS2sf8dEGbFezMG");
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 console.log(resend);
 
