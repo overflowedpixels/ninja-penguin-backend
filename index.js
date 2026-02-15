@@ -244,7 +244,6 @@ app.post("/test", async (req, res) => {
     return res.status(200).json({
       message: "Document generated successfully (Email attempt made)",
       success: true,
-      file: data.toString("base64")
     });
 
 
@@ -265,7 +264,7 @@ app.post("/send-rejection-email", async (req, res) => {
   try {
     await resend.emails.send({
       from: "onboarding@resend.dev",
-      to: email,
+      to: EMAIL_USER,
       subject: "Request Rejected - Service Integrator Portal",
       text: `Hello ${name},\n\nYour request has been rejected for the following reason:\n\n${reason}\n\nRegards,\nTrueSun Team`,
     });
