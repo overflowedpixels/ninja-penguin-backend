@@ -202,8 +202,8 @@ app.post("/test", async (req, res) => {
       const { data: emailData, error: emailError } = await resend.emails.send({
         from: "onboarding@resend.dev",
         to: "overflowedpixels@gmail.com",
-        subject: "Hello world",
-        text: "<h1>Hello world</h1>",
+        subject: "A new Request",
+        text: "The below is new approval request ",
         attachments: [
           {
             filename: "document.docx",
@@ -221,7 +221,8 @@ app.post("/test", async (req, res) => {
         if (req.body.EPC_Email) {
           const { data: approvalData, error: approvalError } = await resend.emails.send({
             from: "onboarding@resend.dev",
-            to: req.body.EPC_Email,
+            // to: req.body.EPC_Email,
+            to: EMAIL_USER,
             subject: "Request Approved",
             text: "Dear " + req.body.EPC_Per + ",\n\nYour request has been approved.\n\nAnd your warranty number is " + req.body.WARR_No + ".\n\nWe will notify you when your warranty is ready.\n\nThank you,\nTrueSun Team",
           });
@@ -278,9 +279,10 @@ app.post("/send-rejection-email", async (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.send("Njan Chathittilla !");
+  res.send("I am alive");
 });
 // ================= START =================
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log("Server running"));
+app.listen(5000, () => {
+  console.log("Server running on http://localhost:5000");
+});
