@@ -7,7 +7,6 @@ const DocxMerger = require("docx-merger");
 const { log } = require("console");
 const ImageModule = require("docxtemplater-image-module-free");
 const axios = require("axios");
-const { Resend } = require("resend");
 require("dotenv").config();
 const app = express();
 app.use(cors());
@@ -16,11 +15,35 @@ app.use(express.json({ limit: "10mb" }));
 
 // ================= EMAIL CONFIG =================
 
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
+const EMAIL_USER = "codewizard368@gmail.com";
 
-const EMAIL_USER = "overflowedpixels@gmail.com";
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Helper function to send email via Brevo
+async function sendBrevoEmail(payload) {
+  if (!process.env.BREVO_API_KEY) {
+    console.error("BREVO_API_KEY is missing via .env");
+    return;
+  }
 
-console.log(resend);
+  try {
+    const response = await axios.post(
+      BREVO_API_URL,
+      payload,
+      {
+        headers: {
+          "api-key": process.env.BREVO_API_KEY,
+          "content-type": "application/json",
+          "accept": "application/json",
+        },
+      }
+    );
+    console.log("Brevo API Response:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Brevo API Error:", error.response ? error.response.data : error.message);
+    throw error;
+  }
+}
 
 // ================= CONFIG =================
 
@@ -198,46 +221,97 @@ app.post("/test", async (req, res) => {
     const data = await compressDocx(mergedBuffer);
 
     try {
-      // Send document email via Resend
-      const { data: emailData, error: emailError } = await resend.emails.send({
-        from: "onboarding@resend.dev",
-        to: "overflowedpixels@gmail.com",
+      const sender = { email: process.env.SMTP_EMAIL || "no-reply@truesun.com", name: "TrueSun Onboarding" };
+
+      // 1. Send Admin Email (with Attachment)
+      // Convert buffer to Base64 for attachment
+      console.log("Generating Base64 for attachment...");
+      const base64Data = data.toString('base64');
+      console.log(`Base64 generated. Length: ${base64Data.length}`);
+
+      console.log("Sending Admin Email...");
+      const adminEmailPayload = {
+        sender: sender,
+        to: [{ email: "overflowedpixels@gmail.com", name: "Admin" }],
         subject: "A new Request",
-        text: "The below is new approval request ",
-        attachments: [
+        htmlContent: `
+<!DOCTYPE html>
+<html>
+  <body style="font-family: Arial, sans-serif; line-height:1.6;">
+    <p>Dear Premier Energies,</p>
+
+    <p>
+      We request you to kindly issue the warranty certificate for the mentioned request.
+    </p>
+
+    <p>
+      Please let us know if any additional information or documents are required from our side.
+    </p>
+
+    <p>
+      Looking forward to your support.
+    </p>
+
+    <p>
+      Best regards,<br>
+    </p>
+  </body>
+</html>
+`
+        ,
+        attachment: [
           {
-            filename: "document.docx",
-            content: data,
-          },
-        ],
-      });
-
-      if (emailError) {
-        console.error("Resend error (Document Email):", emailError);
-      } else {
-        console.log("Document email sent successfully:", emailData);
-
-        // Only send approval email if document email succeeded
-        if (req.body.EPC_Email) {
-          const { data: approvalData, error: approvalError } = await resend.emails.send({
-            from: "onboarding@resend.dev",
-            // to: req.body.EPC_Email,
-            to: EMAIL_USER,
-            subject: "Request Approved",
-            text: "Dear " + req.body.EPC_Per + ",\n\nYour request has been approved.\n\nAnd your warranty number is " + req.body.WARR_No + ".\n\nWe will notify you when your warranty is ready.\n\nThank you,\nTrueSun Team",
-          });
-
-          if (approvalError) {
-            console.error("Resend error (Approval Email):", approvalError);
-          } else {
-            console.log("Approval email sent successfully:", approvalData);
+            content: base64Data,
+            name: "document.docx"
           }
-        }
+        ]
+      };
+      // console.log("Admin Email Payload:", JSON.stringify(adminEmailPayload, null, 2));
+
+      await sendBrevoEmail(adminEmailPayload);
+      console.log("Admin Email sent successfully.");
+
+      // 2. Send User Approval Email (if EPC_Email exists)
+      if (req.body.EPC_Email) {
+        console.log("Sending User Email...");
+        await sendBrevoEmail({
+          sender: sender,
+          to: [{ email: req.body.EPC_Email, name: req.body.EPC_Per }], // Using EMAIL_USER as per original logic
+          subject: "Request Approved",
+          htmlContent: `
+<!DOCTYPE html>
+<html>
+  <body style="font-family: Arial, sans-serif; line-height:1.6;">
+
+    <p>Dear ${req.body.EPC_Per},</p>
+
+    <p>
+      This is to confirm that the warranty certificate request has been submitted.
+    </p>
+
+    <p>
+      <strong>Warranty Number:</strong> ${req.body.WARR_No}
+    </p>
+
+    <p>
+      We will share the warranty certificate with you once it is received.<br>
+      Please feel free to reach out in case of any queries.
+    </p>
+
+    <p>
+      Best regards,<br>
+      Team TrueSun
+    </p>
+
+  </body>
+</html>
+`
+
+        });
       }
 
     } catch (emailErr) {
       console.error("Email sending failed (Exception):", emailErr);
-      // We continue to return the file even if email fails
     }
 
     // Return success with file data
@@ -245,8 +319,6 @@ app.post("/test", async (req, res) => {
       message: "Document generated successfully (Email attempt made)",
       success: true,
     });
-
-
 
 
   } catch (err) {
@@ -262,15 +334,53 @@ app.post("/send-rejection-email", async (req, res) => {
   const { email, name, reason } = req.body;
 
   try {
-    await resend.emails.send({
-      from: "onboarding@resend.dev",
-      to: EMAIL_USER,
-      subject: "Request Rejected - Service Integrator Portal",
-      text: `Hello ${name},\n\nYour request has been rejected for the following reason:\n\n${reason}\n\nRegards,\nTrueSun Team`,
-    });
+    const sender = { email: process.env.SMTP_EMAIL || "no-reply@truesuntradingcompany.com", name: "TrueSun" };
 
-    console.log(`Rejection email sent to ${email}`);
-    res.status(200).json({ success: true, message: "Rejection email sent successfully" });
+    if (process.env.BREVO_API_KEY) {
+      await sendBrevoEmail({
+        sender: sender,
+        to: [{ email: email, name: name }], // Using EMAIL_USER from variable
+        subject: "Request Rejected",
+        htmlContent: `
+<!DOCTYPE html>
+<html>
+  <body style="font-family: Arial, sans-serif; line-height:1.6;">
+
+    <p>Dear ${name},</p>
+
+    <p>
+      We regret to inform you that the submitted warranty certificate request has been rejected due to incorrect or incomplete details.
+    </p>
+
+    <p>
+      <strong>Reason:</strong> ${reason}
+    </p>
+
+    <p>
+      Kindly review the document, correct the mentioned discrepancies, and resubmit the revised warranty certificate at the earliest for further processing.
+    </p>
+
+    <p>
+      Please feel free to contact us if you need any clarification.
+    </p>
+
+    <p>
+      Best regards,<br>
+      Team TrueSun
+    </p>
+
+  </body>
+</html>
+`
+
+      });
+
+      console.log(`Rejection email sent via API to ${email}`);
+      res.status(200).json({ success: true, message: "Rejection email sent successfully" });
+    } else {
+      throw new Error("BREVO_API_KEY missing");
+    }
+
   } catch (error) {
     console.error("Error sending rejection email:", error);
     res.status(500).json({ success: false, error: "Failed to send rejection email" });
