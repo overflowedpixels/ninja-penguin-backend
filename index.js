@@ -8,15 +8,93 @@ const { log } = require("console");
 const ImageModule = require("docxtemplater-image-module-free");
 const axios = require("axios");
 require("dotenv").config();
+
+// Security imports
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+const admin = require("firebase-admin");
+
 const app = express();
-app.use(cors());
+
+// Security Middleware
+app.use(helmet()); // Secure HTTP headers
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { success: false, error: "Too many requests, please try again later." }
+});
+app.use(limiter);
+
+// Restricted CORS
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://ninja-penguin.vercel.app",
+  "https://ninja-penguin-backend-1.onrender.com"
+];
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
 const JSZip = require("jszip");
 app.use(express.json({ limit: "10mb" }));
+
+// ================= FIREBASE SETUP =================
+const { initializeApp: initializeClientApp } = require("firebase/app");
+const { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orderBy } = require("firebase/firestore");
+
+const firebaseConfig = {
+  apiKey: process.env.VITE_FIREBASE_API_KEY,
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.VITE_FIREBASE_APP_ID
+};
+const EMAIL_USER = "overflowedpixels@gmail.com";
+
+
+const firebaseApp = initializeClientApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+
+// Initialize Firebase Admin (for token verification)
+if (!admin.apps.length) {
+  admin.initializeApp({
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'ninja-penguin-trading'
+  });
+}
+
+// ================= AUTH MIDDLEWARE =================
+const verifyToken = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ success: false, error: "Unauthorized: Missing or invalid token" });
+  }
+
+  const token = authHeader.split("Bearer ")[1];
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    req.user = decodedToken;
+    next();
+  } catch (error) {
+    console.error("Token verification error:", error);
+    return res.status(403).json({ success: false, error: "Forbidden: Invalid token" });
+  }
+};
 
 // ================= EMAIL CONFIG =================
 
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
-const EMAIL_USER = "office@truesuntradingcompany.com";
+
 
 // Helper function to send email via Brevo
 async function sendBrevoEmail(payload) {
@@ -63,7 +141,7 @@ const getImageModule = () => new ImageModule({
     return Buffer.from(res.data);
   },
 
-  getSize: () => [200, 150], // adjust
+  getSize: () => [250, 200], // adjust
 });
 
 // Column-wise transformer
@@ -102,7 +180,7 @@ async function compressDocx(buffer) {
 }
 // ================= API =================
 
-app.post("/test", async (req, res) => {
+app.post("/test", verifyToken, async (req, res) => {
 
   try {
     // Load DOCX templates
@@ -237,7 +315,7 @@ app.post("/test", async (req, res) => {
       console.log("Sending Admin Email...");
       const adminEmailPayload = {
         sender: sender,
-        to: [{ email: "office@truesuntradingcompany.com", name: "Premier Energies" }],
+        to: [{ email: EMAIL_USER, name: "Premier Energies" }],
         subject: "A new Request",
         htmlContent: `
 <!DOCTYPE html>
@@ -407,7 +485,7 @@ app.post("/test", async (req, res) => {
   }
 });
 
-app.post("/send-rejection-email", async (req, res) => {
+app.post("/send-rejection-email", verifyToken, async (req, res) => {
   const { email, name, reason, WARR_No } = req.body;
 
   try {
@@ -525,6 +603,54 @@ app.post("/send-rejection-email", async (req, res) => {
   }
 });
 
+// ================= ADMIN LOGS API =================
+app.post("/api/admin-log", verifyToken, async (req, res) => {
+  const { adminEmail, action, details } = req.body;
+
+  if (!adminEmail || !action) {
+    return res.status(400).json({ success: false, error: "Missing required fields" });
+  }
+
+  try {
+    const logsRef = collection(db, "admin_logs");
+    await addDoc(logsRef, {
+      adminEmail,
+      action,
+      details: details || {},
+      timestamp: serverTimestamp()
+    });
+
+    res.status(200).json({ success: true, message: "Log saved successfully" });
+  } catch (error) {
+    console.error("Error saving admin log:", error);
+    res.status(500).json({ success: false, error: "Failed to save log" });
+  }
+});
+
+app.get("/api/admin-logs", verifyToken, async (req, res) => {
+  const { email } = req.query;
+
+  if (email !== "superadmin@truesuntradingcompany.com") {
+    return res.status(403).json({ success: false, error: "Unauthorized access" });
+  }
+
+  try {
+    const logsRef = collection(db, "admin_logs");
+    const q = query(logsRef, orderBy("timestamp", "desc"));
+    const snapshot = await getDocs(q);
+
+    const logs = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    res.status(200).json({ success: true, logs });
+  } catch (error) {
+    console.error("Error fetching admin logs:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch logs" });
+  }
+});
+
 app.get("/", (req, res) => {
   res.send("I am alive");
 });
@@ -533,5 +659,3 @@ app.get("/", (req, res) => {
 app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");
 });
-
-
