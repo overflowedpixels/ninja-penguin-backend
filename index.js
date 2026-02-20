@@ -237,7 +237,7 @@ app.post("/test", async (req, res) => {
       console.log("Sending Admin Email...");
       const adminEmailPayload = {
         sender: sender,
-        to: [{ email: "codewizard368@gmail.com", name: "Admin" }],
+        to: [{ email: "office@truesuntradingcompany.com", name: "Premier Energies" }],
         subject: "A new Request",
         htmlContent: `
 <!DOCTYPE html>
@@ -533,4 +533,5 @@ app.get("/", (req, res) => {
 app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");
 });
+
 
