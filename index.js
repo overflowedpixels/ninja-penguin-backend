@@ -16,7 +16,7 @@ app.use(express.json({ limit: "10mb" }));
 // ================= EMAIL CONFIG =================
 
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
-const EMAIL_USER = "codewizard368@gmail.com";
+const EMAIL_USER = "office@truesuntradingcompany.com";
 
 // Helper function to send email via Brevo
 async function sendBrevoEmail(payload) {
@@ -533,3 +533,4 @@ app.get("/", (req, res) => {
 app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");
 });
+
