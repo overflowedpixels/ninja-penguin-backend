@@ -111,17 +111,19 @@ app.post("/test", async (req, res) => {
     let file3 = fs.readFileSync("template3.docx", "binary");
     let isGreater = false;
 
-    console.log(req.body);
-
-    if (req.body.serialNumbers && req.body.serialNumbers.length > 50) {
+    let numberOfSrialNumbers = 0;
+    numberOfSrialNumbers = req.body.serialNumbers.length;
+    if (numberOfSrialNumbers > 50) {
       isGreater = true;
       // ---------------- TEMPLATE 1 ----------------
       let SerialBefore50 = req.body.serialNumbers.slice(0, 50);
       let remainingSerialNumbers = req.body.serialNumbers.slice(50);
-      let serial = req.body
+      let serial = req.body;
+      serial["NO_ID"] = numberOfSrialNumbers.toString();
       for (let i = 0; i < SerialBefore50.length; i++) {
         serial[`Serial_No${i + 1}`] = SerialBefore50[i];
       }
+      console.log(serial["NO_ID"]);
       const zip1 = new PizZip(file1);
       const doc1 = new Docxtemplater(zip1, {
         paragraphLoop: true,
@@ -172,6 +174,9 @@ app.post("/test", async (req, res) => {
     } else {
 
       let serial = req.body
+      let numberOfSerialNumbers = 0;
+      numberOfSerialNumbers = req.body.serialNumbers.length;
+      serial["NO_ID"] = numberOfSerialNumbers.toString();
       for (let i = 0; i < 50; i++) {
         serial[`Serial_No${i + 1}`] = req.body.serialNumbers[i] ? req.body.serialNumbers[i] : "";
       }
@@ -221,7 +226,7 @@ app.post("/test", async (req, res) => {
     const data = await compressDocx(mergedBuffer);
 
     try {
-      const sender = { email: process.env.SMTP_EMAIL || "no-reply@truesun.com", name: "TrueSun Onboarding" };
+      const sender = { email: process.env.SMTP_EMAIL || "no-reply@truesun.com", name: "True Sun Trading Company" };
 
       // 1. Send Admin Email (with Attachment)
       // Convert buffer to Base64 for attachment
@@ -232,7 +237,7 @@ app.post("/test", async (req, res) => {
       console.log("Sending Admin Email...");
       const adminEmailPayload = {
         sender: sender,
-        to: [{ email: "overflowedpixels@gmail.com", name: "Admin" }],
+        to: [{ email: "codewizard368@gmail.com", name: "Admin" }],
         subject: "A new Request",
         htmlContent: `
 <!DOCTYPE html>
@@ -241,7 +246,7 @@ app.post("/test", async (req, res) => {
     <p>Dear Premier Energies,</p>
 
     <p>
-      We request you to kindly issue the warranty certificate for the mentioned request.
+      We request you to kindly issue the warranty certificate <b>${req.body.WARR_No} </b> for the mentioned request.
     </p>
 
     <p>
@@ -254,6 +259,7 @@ app.post("/test", async (req, res) => {
 
     <p>
       Best regards,<br>
+      <img src="https://ninja-penguin.vercel.app/assets/TruesunLogo-DLSqnK7P.png" alt="True Sun Trading Company" style="height: 80px; width: auto;">
     </p>
   </body>
 </html>
@@ -262,7 +268,7 @@ app.post("/test", async (req, res) => {
         attachment: [
           {
             content: base64Data,
-            name: "document.docx"
+            name: req.body.WARR_No + ".docx"
           }
         ]
       };
@@ -281,31 +287,102 @@ app.post("/test", async (req, res) => {
           htmlContent: `
 <!DOCTYPE html>
 <html>
-  <body style="font-family: Arial, sans-serif; line-height:1.6;">
+<body style="margin:0; padding:0; background:#f4f6f8; font-family:Arial, sans-serif;">
 
-    <p>Dear ${req.body.EPC_Per},</p>
+  <table align="center" width="100%" cellpadding="0" cellspacing="0" style="padding:30px 0;">
+    <tr>
+      <td align="center">
 
-    <p>
-      This is to confirm that the warranty certificate request has been submitted.
-    </p>
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:12px; box-shadow:0 4px 18px rgba(0,0,0,0.08); padding:35px;">
 
-    <p>
-      <strong>Warranty Number:</strong> ${req.body.WARR_No}
-    </p>
+          <!-- Header -->
+          <tr>
+            <td align="center" style="padding-bottom:20px;">
+              <h2 style="margin:0; color:#1a73e8;">Warranty Request Submitted</h2>
+            </td>
+          </tr>
 
-    <p>
-      We will share the warranty certificate with you once it is received.<br>
-      Please feel free to reach out in case of any queries.
-    </p>
+          <!-- Greeting -->
+          <tr>
+            <td style="font-size:16px; color:#333;">
+              Dear <strong>${req.body.EPC_Per}</strong>,
+            </td>
+          </tr>
 
-    <p>
-      Best regards,<br>
-      Team TrueSun
-    </p>
+          <!-- Message -->
+          <tr>
+            <td style="padding-top:15px; font-size:15px; color:#555;">
+              Your warranty certificate request has been successfully submitted.
+              Please save your warranty number for future reference.
+            </td>
+          </tr>
 
-  </body>
+          <!-- Warranty Box -->
+          <tr>
+            <td align="center" style="padding:30px 0;">
+              
+              <div style="
+                background:#f1f7ff;
+                border:2px dashed #1a73e8;
+                border-radius:10px;
+                padding:18px;
+                display:inline-block;
+                min-width:300px;
+              ">
+                <div style="font-size:13px; color:#1a73e8; margin-bottom:8px;">
+                  WARRANTY NUMBER
+                </div>
+
+                <div style="
+                  font-size:22px;
+                  font-weight:bold;
+                  letter-spacing:2px;
+                  color:#000;
+                  background:#fff;
+                  padding:10px 15px;
+                  border-radius:6px;
+                  border:1px solid #d0d7e2;
+                  user-select:all;
+                ">
+                  ${req.body.WARR_No}
+                </div>
+
+                <div style="font-size:12px; color:#777; margin-top:8px;">
+                  Tap & copy this number
+                </div>
+              </div>
+
+            </td>
+          </tr>
+
+          <!-- Info -->
+          <tr>
+            <td style="font-size:15px; color:#555;">
+              We will share the warranty certificate once it is received.
+              If you have any questions, feel free to contact us anytime.
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding-top:30px; font-size:15px; color:#333;">
+              Best regards,<br>
+              <img src="https://ninja-penguin.vercel.app/assets/TruesunLogo-DLSqnK7P.png" alt="True Sun Trading Company" style="height: 80px; width: auto;">
+            </td>
+          </tr>
+
+        </table>
+
+         
+
+      </td>
+    </tr>
+  </table>
+
+</body>
 </html>
 `
+
 
         });
       }
@@ -331,7 +408,7 @@ app.post("/test", async (req, res) => {
 });
 
 app.post("/send-rejection-email", async (req, res) => {
-  const { email, name, reason } = req.body;
+  const { email, name, reason, WARR_No } = req.body;
 
   try {
     const sender = { email: process.env.SMTP_EMAIL || "no-reply@truesuntradingcompany.com", name: "TrueSun" };
@@ -344,34 +421,95 @@ app.post("/send-rejection-email", async (req, res) => {
         htmlContent: `
 <!DOCTYPE html>
 <html>
-  <body style="font-family: Arial, sans-serif; line-height:1.6;">
+<body style="margin:0; padding:0; background:#f4f6f8; font-family:Arial, sans-serif;">
 
-    <p>Dear ${name},</p>
+  <table align="center" width="100%" cellpadding="0" cellspacing="0" style="padding:30px 0;">
+    <tr>
+      <td align="center">
 
-    <p>
-      We regret to inform you that the submitted warranty certificate request has been rejected due to incorrect or incomplete details.
-    </p>
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:12px; box-shadow:0 4px 18px rgba(0,0,0,0.08); padding:35px;">
 
-    <p>
-      <strong>Reason:</strong> ${reason}
-    </p>
+          <!-- Header -->
+          <tr>
+            <td align="center" style="padding-bottom:20px;">
+              <h2 style="margin:0; color:#d93025;">Request Rejected</h2>
+            </td>
+          </tr>
 
-    <p>
-      Kindly review the document, correct the mentioned discrepancies, and resubmit the revised warranty certificate at the earliest for further processing.
-    </p>
+          <!-- Greeting -->
+          <tr>
+            <td style="font-size:16px; color:#333;">
+              Dear <strong>${name}</strong>,
+            </td>
+          </tr>
 
-    <p>
-      Please feel free to contact us if you need any clarification.
-    </p>
+          <!-- Message -->
+          <tr>
+            <td style="padding-top:15px; font-size:15px; color:#555;">
+              We regret to inform you that your warranty certificate No. <strong style="color:#d93025;">${WARR_No}</strong> request has been
+              <strong style="color:#d93025;">rejected</strong> due to incorrect or incomplete details.
+            </td>
+          </tr>
 
-    <p>
-      Best regards,<br>
-      Team TrueSun
-    </p>
+          <!-- Reason Box -->
+          <tr>
+            <td align="center" style="padding:30px 0;">
+              
+              <div style="
+                background:#fff3f3;
+                border:2px dashed #d93025;
+                border-radius:10px;
+                padding:18px;
+                display:inline-block;
+                min-width:300px;
+              ">
+                <div style="font-size:13px; color:#d93025; margin-bottom:8px;">
+                  REJECTION REASON
+                </div>
 
-  </body>
+                <div style="
+                  font-size:16px;
+                  font-weight:bold;
+                  color:#000;
+                  background:#ffffff;
+                  padding:12px 15px;
+                  border-radius:6px;
+                  border:1px solid #f1b0b0;
+                  line-height:1.5;
+                ">
+                  ${reason}
+                </div>
+              </div>
+
+            </td>
+          </tr>
+
+          <!-- Instruction -->
+          <tr>
+            <td style="font-size:15px; color:#555;">
+              Kindly review the document, correct the discrepancies mentioned above, and
+              resubmit the revised warranty certificate at the earliest for further processing.
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding-top:30px; font-size:15px; color:#333;">
+              Best regards,<br>
+              <img src="https://ninja-penguin.vercel.app/assets/TruesunLogo-DLSqnK7P.png" alt="True Sun Trading Company" style="height: 80px; width: auto;">
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
 </html>
 `
+
 
       });
 
