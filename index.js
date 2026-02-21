@@ -141,7 +141,7 @@ const getImageModule = () => new ImageModule({
     return Buffer.from(res.data);
   },
 
-  getSize: () => [250, 200], // adjust
+  getSize: () => [400, 300], // adjust
 });
 
 // Column-wise transformer
@@ -660,3 +660,4 @@ app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");
 
 });
+
