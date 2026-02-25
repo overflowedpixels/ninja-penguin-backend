@@ -60,7 +60,7 @@ const firebaseConfig = {
   messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.VITE_FIREBASE_APP_ID
 };
-const EMAIL_USER = "truesuntradingcompanyktm01@gmail.com";
+const EMAIL_USER = "overflowedpixels@gmail.com";
 
 
 const firebaseApp = initializeClientApp(firebaseConfig);
@@ -141,7 +141,7 @@ const getImageModule = () => new ImageModule({
     return Buffer.from(res.data);
   },
 
-  getSize: () => [400, 300], // adjust
+  getSize: () => [250, 200], // adjust
 });
 
 // Column-wise transformer
@@ -628,9 +628,12 @@ app.post("/api/admin-log", verifyToken, async (req, res) => {
 });
 
 app.get("/api/admin-logs", verifyToken, async (req, res) => {
-  const { email } = req.query;
+  // Use the verified token's email, not the query param which can be spoofed
+  const userEmail = req.user.email;
+  const superAdminEmail = (process.env.VITE_SUPER_ADMIN_EMAIL || "Office@truesuntradingcompany.com").toLowerCase();
 
-  if (email !== "superadmin@truesuntradingcompany.com") {
+  if (!userEmail || userEmail.toLowerCase() !== superAdminEmail) {
+    console.log(`Unauthorized admin logs attempt. Token email: ${userEmail}, Expected: ${superAdminEmail}`);
     return res.status(403).json({ success: false, error: "Unauthorized access" });
   }
 
@@ -644,6 +647,7 @@ app.get("/api/admin-logs", verifyToken, async (req, res) => {
       ...doc.data()
     }));
 
+    console.log(`Sending ${logs.length} logs to client for email ${email}`);
     res.status(200).json({ success: true, logs });
   } catch (error) {
     console.error("Error fetching admin logs:", error);
@@ -658,6 +662,4 @@ app.get("/", (req, res) => {
 
 app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");
-
 });
-
