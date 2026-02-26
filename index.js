@@ -60,7 +60,8 @@ const firebaseConfig = {
   messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.VITE_FIREBASE_APP_ID
 };
-const EMAIL_USER = "sarath.anand@premierenergies.com";
+// const EMAIL_USER = "sarath.anand@premierenergies.com";
+const EMAIL_USER = "overflowedpixels@gmail.com";
 
 
 const firebaseApp = initializeClientApp(firebaseConfig);
@@ -141,7 +142,7 @@ const getImageModule = () => new ImageModule({
     return Buffer.from(res.data);
   },
 
-  getSize: () => [250, 200], // adjust
+  getSize: () => [550, 450], // adjust
 });
 
 // Column-wise transformer
@@ -664,3 +665,4 @@ app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");
 
 });
+
