@@ -60,7 +60,7 @@ const firebaseConfig = {
   messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.VITE_FIREBASE_APP_ID
 };
-const EMAIL_USER = "overflowedpixels@gmail.com";
+const EMAIL_USER = "sarath.anand@premierenergies.com";
 
 
 const firebaseApp = initializeClientApp(firebaseConfig);
@@ -662,4 +662,5 @@ app.get("/", (req, res) => {
 
 app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");
+
 });
