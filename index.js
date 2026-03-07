@@ -50,7 +50,19 @@ app.use(express.json({ limit: "10mb" }));
 
 // ================= FIREBASE SETUP =================
 const { initializeApp: initializeClientApp } = require("firebase/app");
-const { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orderBy } = require("firebase/firestore");
+const {
+  getFirestore,
+  collection,
+  addDoc,
+  serverTimestamp,
+  getDocs,
+  query,
+  orderBy,
+  doc,
+  getDoc,
+  updateDoc,
+  runTransaction
+} = require("firebase/firestore");
 
 const firebaseConfig = {
   apiKey: process.env.VITE_FIREBASE_API_KEY,
@@ -656,6 +668,91 @@ app.get("/api/admin-logs", verifyToken, async (req, res) => {
   }
 });
 
+// CREATE a new request
+app.post('/api/requests', async (req, res) => {
+    try {
+        const requestData = {
+            ...req.body,
+            status: 'pending',
+        };
+
+        let finalDocId;
+
+        await runTransaction(db, async (transaction) => {
+            const counterRef = doc(db, 'counters', 'warranty_cert');
+            const counterDoc = await transaction.get(counterRef);
+
+            let nextId;
+            if (!counterDoc.exists()) {
+                nextId = 1677;
+            } else {
+                const currentVal = Number(counterDoc.data().currentValue);
+                nextId = currentVal < 1677 ? 1677 : currentVal + 1;
+            }
+
+            let availableId = null;
+            let attempts = 0;
+            const maxAttempts = 10;
+
+            while (attempts < maxAttempts) {
+                const candidateId = `WR_${String(nextId)}`;
+                const candidateRef = doc(db, 'requests', candidateId);
+                const candidateDoc = await transaction.get(candidateRef);
+
+                if (!candidateDoc.exists()) {
+                    availableId = candidateId;
+                    break;
+                }
+                nextId++;
+                attempts++;
+            }
+
+            if (!availableId) {
+                throw new Error('Unable to generate a unique Request ID.');
+            }
+
+            finalDocId = availableId;
+            const newRequestRef = doc(db, 'requests', finalDocId);
+
+            transaction.set(counterRef, { currentValue: nextId }, { merge: true });
+
+            // Note: serverTimestamp() from standard SDK works but it needs to be the backend's copy of `serverTimestamp`.
+            transaction.set(newRequestRef, {
+                ...requestData,
+                warrantyCertificateNo: finalDocId,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+        });
+
+        res.status(201).json({ id: finalDocId, message: 'Request submitted successfully' });
+    } catch (error) {
+        console.error('Error submitting form:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// UPDATE an existing request
+app.put('/api/requests/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const requestData = {
+            ...req.body,
+            status: 'pending',
+            updatedAt: serverTimestamp()
+        };
+
+        const docRef = doc(db, 'requests', id);
+        await updateDoc(docRef, { ...requestData, warrantyCertificateNo: id });
+
+        res.status(200).json({ id, message: 'Request updated successfully' });
+    } catch (error) {
+        console.error('Error updating form:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
 app.get("/", (req, res) => {
   res.send("I am alive");
 });
@@ -665,5 +762,6 @@ app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");
 
 });
+
 
 
