@@ -751,7 +751,23 @@ app.put('/api/requests/:id', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// GET a request by ID
+app.get('/api/requests/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const docRef = doc(db, 'requests', id);
+        const docSnap = await getDoc(docRef);
 
+        if (docSnap.exists()) {
+            res.status(200).json(docSnap.data());
+        } else {
+            res.status(404).json({ error: 'Request not found.' });
+        }
+    } catch (error) {
+        console.error('Error fetching request:', error);
+        res.status(500).json({ error: 'Failed to fetch status.' });
+    }
+});
 
 app.get("/", (req, res) => {
   res.send("I am alive");
@@ -762,6 +778,7 @@ app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");
 
 });
+
 
 
 
