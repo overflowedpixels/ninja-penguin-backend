@@ -34,6 +34,7 @@ const allowedOrigins = [
   "https://ninja-penguin.vercel.app",
   "https://ninja-penguin-backend-1.onrender.com",
   "https://aura-self-six.vercel.app",
+  "https://pe-warranty-form.vercel.app"
 ];
 app.use(cors({
   origin: function (origin, callback) {
@@ -779,6 +780,7 @@ app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");
 
 });
+
 
 
 
