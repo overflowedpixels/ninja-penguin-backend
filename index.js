@@ -34,7 +34,8 @@ const allowedOrigins = [
   "https://ninja-penguin.vercel.app",
   "https://ninja-penguin-backend-1.onrender.com",
   "https://aura-self-six.vercel.app",
-  "https://pe-warranty-form.vercel.app"
+  "https://pe-warranty-form.vercel.app",
+  "https://pe-warranty-dashboard.vercel.app"
 ];
 app.use(cors({
   origin: function (origin, callback) {
